@@ -6,6 +6,7 @@ import mechafil.power as np_power
 import mechafil.data as data
 
 import numpy as np
+import jax.numpy as jnp
 from tqdm.auto import tqdm
 
 class TestPower(unittest.TestCase):
@@ -46,15 +47,21 @@ class TestPower(unittest.TestCase):
             for rr in rr_vec:
                 for fpr in fpr_vec:
                     for duration in duration_vec:
-                        # jax
-                        rb_dict_jax, qa_dict_jax = jax_power.forecast_power_stats(
-                            rb_power_zero, qa_power_zero, rbp, rb_known_scheduled_expire_vec, qa_known_scheduled_expire_vec,
-                            rr, fpr, duration, forecast_length
-                        )
                         # mechafil
                         rb_df_mechafil, qa_df_mechafil = np_power.forecast_power_stats(
                             rb_power_zero, qa_power_zero, rbp, rb_known_scheduled_expire_vec, qa_known_scheduled_expire_vec,
                             rr, fpr, duration, forecast_length, qap_method='basic'
+                        )
+
+                        # jax
+                        rbp_vec_in = jnp.ones(forecast_length)*rbp
+                        rr_vec_in = jnp.ones(forecast_length)*rr
+                        fpr_vec_in = jnp.ones(forecast_length)*fpr
+                        duration_int = int(duration)
+                        rb_dict_jax, qa_dict_jax = jax_power.forecast_power_stats(
+                            rb_power_zero, qa_power_zero, 
+                            rbp_vec_in, rb_known_scheduled_expire_vec, qa_known_scheduled_expire_vec,
+                            rr_vec_in, fpr_vec_in, duration_int, forecast_length
                         )
 
                         # compare
