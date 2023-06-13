@@ -71,20 +71,7 @@ def update_cs_day(carry, x):
         scheduled_pledge_release,
         lock_target,
     )
-    # print('%s,%0.02f,%0.02f,%0.02f,%0.02f,%0.02f,%0.02f,%0.02f,%0.02f,%0.02f,%0.02f' % 
-    #     ('jax',
-    #     cs_dict['day_network_reward'][day_idx], 
-    #     circ_supply,
-    #     cs_dict['day_onboarded_power_QAP_PIB'][day_idx], 
-    #     cs_dict['day_renewed_power_QAP_PIB'][day_idx], 
-    #     cs_dict['network_QAP_EIB'][day_idx], 
-    #     cs_dict['network_baseline_EIB'][day_idx], 
-    #     renewal_rate_vec[day_idx],
-    #     scheduled_pledge_release,
-    #     day_locked_pledge, 
-    #     day_renewed_pledge
-    #     )
-    # )
+
     # Compute daily change in block rewards collateral
     day_locked_rewards = compute_day_locked_rewards(
         cs_dict["day_network_reward"][day_idx]
@@ -105,13 +92,7 @@ def update_cs_day(carry, x):
     cs_dict["network_locked"] = cs_dict["network_locked"].at[day_idx].set(
         cs_dict["network_locked"][day_idx - 1] + pledge_delta + reward_delta
     )
-    # print('%s,%0.02f,%0.02f,%0.02f,%0.02f' % 
-    #         ('jax', 
-    #         cs_dict["network_locked"][day_idx - 1], 
-    #         pledge_delta, 
-    #         reward_delta,
-    #         cs_dict["network_locked"][day_idx], )
-    # )
+    
     # Update gas burnt
     pred = (day_idx >= len_burnt_fil_vec)
     gas_burn_val = lax.cond(
@@ -123,14 +104,6 @@ def update_cs_day(carry, x):
     cs_dict["network_gas_burn"] = cs_dict["network_gas_burn"].at[day_idx].set(gas_burn_val)
 
     # Find circulating supply balance and update
-    # print('=> %s,%0.02f,%0.02f,%0.02f,%0.02f,%0.02f' % 
-    #         ('jax', 
-    #         cs_dict["disbursed_reserve"][day_idx], 
-    #         cs_dict["cum_network_reward"][day_idx], 
-    #         cs_dict["total_vest"][day_idx], 
-    #         cs_dict["network_locked"][day_idx], 
-    #         cs_dict["network_gas_burn"][day_idx],)
-    # )
     circ_supply = (
         cs_dict["disbursed_reserve"][day_idx]  # from initialise_circulating_supply_df
         + cs_dict["cum_network_reward"][day_idx]  # from the minting_model
@@ -138,7 +111,7 @@ def update_cs_day(carry, x):
         - cs_dict["network_locked"][day_idx]  # from simulation loop
         - cs_dict["network_gas_burn"][day_idx]  # comes from user inputs
     )
-    # circ_supply = jnp.maximum(circ_supply, 0)
+    circ_supply = jnp.maximum(circ_supply, 0)
     cs_dict["circ_supply"] = cs_dict["circ_supply"].at[day_idx].set(circ_supply)
 
     return_carry = (
@@ -155,7 +128,7 @@ def update_cs_day(carry, x):
     )
     return (return_carry, None)
 
-# @partial(jax.jit, static_argnums=(0,1,2,3,4,5,6,11,12))
+@partial(jax.jit, static_argnums=(0,1,2,3,4,5,6,12))
 def forecast_circulating_supply(
     start_date: np.datetime64,
     current_date: np.datetime64,
@@ -199,7 +172,7 @@ def forecast_circulating_supply(
     return cs_dict
 
 
-# @partial(jax.jit, static_argnums=(0,1,2,3,4))
+@partial(jax.jit, static_argnums=(0,1,2,3))
 def initialise_circulating_supply_dict(
     start_date: np.datetime64,
     end_date: np.datetime64,
@@ -239,6 +212,11 @@ def initialise_circulating_supply_dict(
         * (17066618961773411890063046 * 10**-18),
     }
     
-    cs_dict = inner_join(cs_dict, vest_dict, key='days', coerce=False)
-    cs_dict = inner_join(cs_dict, mint_dict, key='days', coerce=False)
-    return cs_dict
+    # cs_dict = inner_join(cs_dict, vest_dict, key='days', coerce=False)
+    # cs_dict = inner_join(cs_dict, mint_dict, key='days', coerce=False)
+    # return cs_dict
+    vest_dict.pop('days')
+    mint_dict.pop('days')
+    # TODO: you can try to do some date alignment checking here
+    # it is coded such that the dates should already be aligned, however
+    return {**cs_dict, **vest_dict, **mint_dict}
