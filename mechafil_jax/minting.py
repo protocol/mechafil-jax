@@ -1,16 +1,15 @@
 from typing import Union, Dict
 
-import datetime
 import numpy as np
 from numpy.typing import NDArray
 
+import jax
 import jax.numpy as jnp
+
+from functools import partial
 
 from .constants import EXA, EXBI, PIB, NETWORK_START
 from .date_utils import datetime64_delta_to_days
-# from .data import get_storage_baseline_value, \
-#     get_cum_capped_rb_power, get_cum_capped_qa_power
-
 
 LAMBDA = np.log(2) / (
     6.0 * 365
@@ -31,7 +30,7 @@ GROWTH_RATE = float(
 # 3189227188947035000 from https://observable-api.starboard.ventures/api/v1/observable/network-storage-capacity/new_baseline_power
 BASELINE_STORAGE = 2.766213637444971 * EXA / EXBI  # b_0 from https://spec.filecoin.io/#section-systems.filecoin_token
 
-
+@partial(jax.jit, static_argnums=(0, 1, 6, 7, 8))
 def compute_minting_trajectory_df(
     start_date: np.datetime64,
     end_date: np.datetime64,
@@ -54,12 +53,11 @@ def compute_minting_trajectory_df(
     capped_power_reference = 'network_RBP_EIB' if minting_base == 'rbp' else 'network_QAP_EIB'
 
     minting_dict = {
-        "days": np.arange(start_day, end_day),
-        "date": np.arange(start_date, end_date, dtype='datetime64[D]'),
+        "days": jnp.arange(start_day, end_day),
         "network_RBP_EIB": rb_total_power_eib,
         "network_QAP_EIB": qa_total_power_eib,
-        "day_onboarded_power_QAP": qa_day_onboarded_power_pib * PIB,
-        "day_renewed_power_QAP": qa_day_renewed_power_pib * PIB,
+        "day_onboarded_power_QAP_PIB": qa_day_onboarded_power_pib,
+        "day_renewed_power_QAP_PIB": qa_day_renewed_power_pib,
     }
 
     # Compute cumulative rewards due to simple minting
@@ -74,34 +72,43 @@ def compute_minting_trajectory_df(
     minting_dict["cum_baseline_reward"] = cum_baseline_reward(minting_dict["network_time"])
     # Add cumulative rewards and get daily rewards minted
     minting_dict["cum_network_reward"] = minting_dict["cum_baseline_reward"] + minting_dict["cum_simple_reward"]
-    minting_dict["day_network_reward"] = np.diff(minting_dict["cum_network_reward"], prepend=minting_dict["cum_network_reward"][0])
-    minting_dict["day_network_reward"][0] = minting_dict["day_network_reward"][1]  # to match MechaFIL
+    cum_network_reward_zero = minting_dict["cum_network_reward"][0]
+    
+    day_network_reward = jnp.zeros(len(minting_dict["cum_network_reward"])+1).astype(jnp.float32)
+    day_network_reward = day_network_reward.at[1:].set(minting_dict["cum_network_reward"])
+    day_network_reward = day_network_reward.at[0].set(cum_network_reward_zero) # equiv. to prepend in NP
+    day_network_reward = jnp.diff(day_network_reward)
+    day_network_reward = day_network_reward.at[0].set(day_network_reward[1]) # to match mechaFIL
+    minting_dict["day_network_reward"] = day_network_reward
 
     return minting_dict
 
-
+@jax.jit
 def cum_simple_minting(day: int) -> float:
     """
     Simple minting - the total number of tokens that should have been emitted
     by simple minting up until date provided.
     """
-    return SIMPLE_ALLOC * (1 - np.exp(-LAMBDA * day))
+    return SIMPLE_ALLOC * (1 - jnp.exp(-LAMBDA * day))
 
 
+@partial(jax.jit, static_argnums=(0,1,2))
 def compute_baseline_power_array(
     start_date: np.datetime64, end_date: np.datetime64, init_baseline: float,
 ) -> Union[jnp.ndarray, NDArray, float]:
     arr_len = datetime64_delta_to_days(end_date - start_date)
-    exponents = np.arange(0, arr_len)
-    baseline_power_arr = init_baseline * np.exp(GROWTH_RATE * exponents)
+    exponents = jnp.arange(0, arr_len)
+    baseline_power_arr = init_baseline * jnp.exp(GROWTH_RATE * exponents)
     return baseline_power_arr
 
 
+@jax.jit
 def network_time(cum_capped_power: Union[jnp.ndarray, NDArray, float]) -> Union[jnp.ndarray, NDArray, float]:
     b0 = BASELINE_STORAGE
     g = GROWTH_RATE
-    return (1 / g) * np.log(((g * (cum_capped_power)) / b0) + 1)
+    return (1 / g) * jnp.log(((g * (cum_capped_power)) / b0) + 1)
 
 
+@jax.jit
 def cum_baseline_reward(network_time: Union[jnp.ndarray, NDArray, float]) -> Union[jnp.ndarray, NDArray, float]:
-    return BASELINE_ALLOC * (1 - np.exp(-LAMBDA * network_time))
+    return BASELINE_ALLOC * (1 - jnp.exp(-LAMBDA * network_time))

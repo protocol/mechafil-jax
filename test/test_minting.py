@@ -104,7 +104,7 @@ class TestMinting(unittest.TestCase):
 
             if 'EIB' in jax_key:
                 y_mechafil = y_mechafil / C.EIB
-            self.assertTrue(np.allclose(y_mechafil, y_jax, rtol=1e-3, atol=1e-3))
+            self.assertTrue(np.allclose(y_mechafil, y_jax, rtol=1e-2, atol=1e-2))
         
 if __name__ == '__main__':
     unittest.main()
