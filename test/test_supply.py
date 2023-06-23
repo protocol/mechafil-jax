@@ -86,7 +86,7 @@ class TestSupply(unittest.TestCase):
         locked_fil_zero = start_day_stats["locked_fil"]
         daily_burnt_fil = fil_stats_df["burnt_fil"].diff().mean()
         burnt_fil_vec = fil_stats_df["burnt_fil"].values
-        forecast_renewal_rate_vec = np.ones(forecast_length+1)*rr
+        forecast_renewal_rate_vec = np.ones(forecast_length)*rr
         past_renewal_rate_vec = fil_stats_df["rb_renewal_rate"].values[:-1]
         renewal_rate_vec = np.concatenate(
             [past_renewal_rate_vec, forecast_renewal_rate_vec]

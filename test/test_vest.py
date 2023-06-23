@@ -6,6 +6,7 @@ import mechafil.vesting as np_vest
 import mechafil.data as data
 
 import numpy as np
+import pickle
 
 class TestVesting(unittest.TestCase):
     def test_vesting(self):
@@ -29,8 +30,14 @@ class TestVesting(unittest.TestCase):
         )
 
         # compare
-        self.assertTrue(np.allclose(np.asarray(np_vesting_df['total_vest'].values), 
-                                    np.asarray(jax_vesting_dict['total_vest'])))
+        is_close = np.allclose(np.asarray(np_vesting_df['total_vest'].values), 
+                                    np.asarray(jax_vesting_dict['total_vest']))
+        if not is_close:
+            with open('vesting.pkl', 'wb') as f:
+                pickle.dump((np_vesting_df, jax_vesting_dict), f)
+                print('Test failed - saving vesting.pkl for debugging')
+        self.assertTrue(is_close)
+        
         
 if __name__ == '__main__':
     unittest.main()

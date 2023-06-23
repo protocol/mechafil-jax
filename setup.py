@@ -10,6 +10,10 @@ setuptools.setup(
         "numpy", 
         "scipy", 
         "matplotlib",
-        "mechaFIL"  # for testing
     ],
+
+    tests_require = [
+        "mechaFIL",
+        'pytest',
+    ]
 )

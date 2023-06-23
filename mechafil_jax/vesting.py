@@ -72,7 +72,9 @@ def compute_vesting_trajectory(
     
     vest_dict_to_return = {
         "days": day_vector,
-        'total_vest': total_vest,
+        'total_day_vest': total_day_vest,
+        'total_vest': total_vest,  # for debugging. can remove later
+        **vest_dict
     }
     return vest_dict_to_return
 
@@ -87,4 +89,4 @@ def vest(amount: float, time: int, end_day: int) -> jnp.ndarray:
     extra_to_pad_ = max(0, end_day - int(time))
     ones_padded_ = jnp.pad(ones_, (0, extra_to_pad_))
     vest_ = ones_padded_ / time
-    return jnp.asarray(amount * vest_)
+    return amount * vest_
