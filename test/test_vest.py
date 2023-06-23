@@ -31,7 +31,7 @@ class TestVesting(unittest.TestCase):
 
         # compare
         is_close = np.allclose(np.asarray(np_vesting_df['total_vest'].values), 
-                                    np.asarray(jax_vesting_dict['total_vest']))
+                               np.asarray(jax_vesting_dict['total_vest']))
         if not is_close:
             with open('vesting.pkl', 'wb') as f:
                 pickle.dump((np_vesting_df, jax_vesting_dict), f)

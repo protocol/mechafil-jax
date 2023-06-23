@@ -68,8 +68,8 @@ class TestPower(unittest.TestCase):
                         keys = ['cum_onboarded_power', 'cum_renewed_power', 'cum_expire_scheduled_power', 'total_power']
                         for k in keys:
                             try:
-                                self.assertTrue(np.allclose(rb_df_mechafil[k], np.asarray(rb_dict_jax[k]), rtol=1e-2, atol=1e-2))
-                                self.assertTrue(np.allclose(qa_df_mechafil[k], np.asarray(qa_dict_jax[k]), rtol=1e-2, atol=1e-2))
+                                self.assertTrue(np.allclose(rb_df_mechafil[k], np.asarray(rb_dict_jax[k]), rtol=1e-3, atol=1e-3))
+                                self.assertTrue(np.allclose(qa_df_mechafil[k], np.asarray(qa_dict_jax[k]), rtol=1e-3, atol=1e-3))
                             except AssertionError as e:
                                 print('Failed Configuration! rbp=', rbp, 'rr=', rr, 'fpr=', fpr, 'duration=', duration)
                                 raise e

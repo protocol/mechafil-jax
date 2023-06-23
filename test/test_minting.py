@@ -104,7 +104,15 @@ class TestMinting(unittest.TestCase):
 
             if 'EIB' in jax_key:
                 y_mechafil = y_mechafil / C.EIB
-            self.assertTrue(np.allclose(y_mechafil, y_jax, rtol=1e-2, atol=1e-2))
+            # self.assertTrue(np.allclose(y_mechafil, y_jax))  # fails - due to overflow? look at cum_simple_reward function
+            is_close = np.allclose(y_mechafil, y_jax, rtol=1e-2, atol=1e-2)
+            # print('>'*20)
+            # print(f"{k[0]} --> SSE={np.sqrt(np.sum((y_mechafil - y_jax)**2))}")
+            # print(f"mechafil: {y_mechafil}")
+            # print(f"jax: {y_jax}")
+            # print(f"diff: {y_mechafil - y_jax}")
+            # print('<'*20)
+            self.assertTrue(is_close)
         
 if __name__ == '__main__':
     unittest.main()
