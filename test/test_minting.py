@@ -1,6 +1,9 @@
 import unittest
 from datetime import date, timedelta
 
+from jax import config
+config.update("jax_enable_x64", True)
+
 import mechafil.power as np_power
 import mechafil.data as data
 
@@ -104,7 +107,8 @@ class TestMinting(unittest.TestCase):
 
             if 'EIB' in jax_key:
                 y_mechafil = y_mechafil / C.EIB
-            self.assertTrue(np.allclose(y_mechafil, y_jax, rtol=1e-2, atol=1e-2))
+            is_close = np.allclose(y_mechafil, y_jax)
+            self.assertTrue(is_close)
         
 if __name__ == '__main__':
     unittest.main()

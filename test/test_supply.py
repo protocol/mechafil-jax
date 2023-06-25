@@ -1,6 +1,10 @@
 import unittest
 from datetime import date, timedelta
 
+
+from jax import config
+config.update("jax_enable_x64", True)
+
 import mechafil.power as np_power
 import mechafil.data as data
 import mechafil.minting as np_minting
@@ -146,7 +150,7 @@ class TestSupply(unittest.TestCase):
         keys = ['circ_supply', 'network_gas_burn', 'day_locked_pledge', 'day_renewed_pledge',
                 'network_locked_pledge', 'network_locked', 'network_locked_reward', 'disbursed_reserve']
         for k in keys:
-            self.assertTrue(np.allclose(cil_df[k].values, np.asarray(cil_jax[k]), rtol=1e-3, atol=1e-3), k)
+            self.assertTrue(np.allclose(cil_df[k].values, np.asarray(cil_jax[k])), k)
 
 if __name__ == '__main__':
     unittest.main()

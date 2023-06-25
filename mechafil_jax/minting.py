@@ -11,7 +11,7 @@ from functools import partial
 from .constants import EXA, EXBI, PIB, NETWORK_START
 from .date_utils import datetime64_delta_to_days
 
-LAMBDA = np.log(2) / (
+LAMBDA = jnp.log(2) / (
     6.0 * 365
 )  # minting exponential reward decay rate (6yrs half-life)
 FIL_BASE = 2_000_000_000.0
@@ -74,7 +74,7 @@ def compute_minting_trajectory_df(
     minting_dict["cum_network_reward"] = minting_dict["cum_baseline_reward"] + minting_dict["cum_simple_reward"]
     cum_network_reward_zero = minting_dict["cum_network_reward"][0]
     
-    day_network_reward = jnp.zeros(len(minting_dict["cum_network_reward"])+1).astype(jnp.float32)
+    day_network_reward = jnp.zeros(len(minting_dict["cum_network_reward"])+1)
     day_network_reward = day_network_reward.at[1:].set(minting_dict["cum_network_reward"])
     day_network_reward = day_network_reward.at[0].set(cum_network_reward_zero) # equiv. to prepend in NP
     day_network_reward = jnp.diff(day_network_reward)
