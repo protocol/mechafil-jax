@@ -2,6 +2,7 @@ from typing import Dict
 import datetime
 from functools import partial
 
+# remove comments if you want to run in 64 bit
 # from jax import config
 # config.update("jax_enable_x64", True)
 
