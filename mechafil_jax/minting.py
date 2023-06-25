@@ -53,7 +53,7 @@ def compute_minting_trajectory_df(
     capped_power_reference = 'network_RBP_EIB' if minting_base == 'rbp' else 'network_QAP_EIB'
 
     minting_dict = {
-        "days": jnp.arange(start_day, end_day).astype(jnp.float32),
+        "days": jnp.arange(start_day, end_day),
         "network_RBP_EIB": rb_total_power_eib,
         "network_QAP_EIB": qa_total_power_eib,
         "day_onboarded_power_QAP_PIB": qa_day_onboarded_power_pib,
@@ -73,7 +73,6 @@ def compute_minting_trajectory_df(
     # Add cumulative rewards and get daily rewards minted
     minting_dict["cum_network_reward"] = minting_dict["cum_baseline_reward"] + minting_dict["cum_simple_reward"]
     cum_network_reward_zero = minting_dict["cum_network_reward"][0]
-    # print(cum_network_reward_zero)
     
     day_network_reward = jnp.zeros(len(minting_dict["cum_network_reward"])+1)
     day_network_reward = day_network_reward.at[1:].set(minting_dict["cum_network_reward"])
@@ -81,7 +80,6 @@ def compute_minting_trajectory_df(
     day_network_reward = jnp.diff(day_network_reward)
     day_network_reward = day_network_reward.at[0].set(day_network_reward[1]) # to match mechaFIL
     minting_dict["day_network_reward"] = day_network_reward
-    # print(day_network_reward.dtype)
 
     return minting_dict
 

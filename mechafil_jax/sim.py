@@ -1,6 +1,9 @@
-from typing import Union, Dict, Tuple
+from typing import Dict
 import datetime
 from functools import partial
+
+# from jax import config
+# config.update("jax_enable_x64", True)
 
 import numpy as np
 from numpy.typing import NDArray
@@ -12,7 +15,7 @@ import mechafil_jax.vesting as vesting
 import mechafil_jax.minting as minting
 import mechafil_jax.supply as supply
 
-# @partial(jax.jit, static_argnums=(4,5,6,7,8))
+@partial(jax.jit, static_argnums=(4,5,6,7))
 def run_sim(
     rb_onboard_power: jnp.array,
     renewal_rate: jnp.array,
@@ -23,12 +26,11 @@ def run_sim(
     current_date: datetime.date,
     forecast_length: int,
     duration: int,
-    data: Tuple,
+    data: Dict,
 ):
     end_date = current_date + datetime.timedelta(days=forecast_length)
 
     # extract data
-    # TODO: move into its own function to clean up
     rb_power_zero = data["rb_power_zero"]
     qa_power_zero = data["qa_power_zero"]
     historical_raw_power_eib = data["historical_raw_power_eib"]
@@ -56,12 +58,12 @@ def run_sim(
     # TODO: move the code block below into its own function
     #################################################
     # need to concatenate historical power (from start_date to current_date-1) to this
-    rb_total_power_eib = jnp.concatenate((historical_raw_power_eib, rb_power_forecast["total_power"] / 1024.0))
-    qa_total_power_eib = jnp.concatenate((historical_qa_power_eib, qa_power_forecast["total_power"] / 1024.0))
+    rb_total_power_eib = jnp.concatenate((historical_raw_power_eib, (rb_power_forecast["total_power"][:-1] / 1024.0)))
+    qa_total_power_eib = jnp.concatenate((historical_qa_power_eib, (qa_power_forecast["total_power"][:-1] / 1024.0)))
     # rb_day_onboarded_power_pib = rb_power_forecast["onboarded_power"]
     # rb_day_renewed_power_pib = rb_power_forecast["renewed_power"]
-    qa_day_onboarded_power_pib = jnp.concatenate([historical_onboarded_qa_power_pib, qa_power_forecast["onboarded_power"]])
-    qa_day_renewed_power_pib = jnp.concatenate([historical_renewed_qa_power_pib, qa_power_forecast["renewed_power"]])
+    qa_day_onboarded_power_pib = jnp.concatenate([historical_onboarded_qa_power_pib, qa_power_forecast["onboarded_power"][:-1]])
+    qa_day_renewed_power_pib = jnp.concatenate([historical_renewed_qa_power_pib, qa_power_forecast["renewed_power"][:-1]])
 
     #################################################
 
@@ -82,7 +84,7 @@ def run_sim(
         init_baseline_eib
     )
 
-    full_renewal_rate_vec = np.concatenate(
+    full_renewal_rate_vec = jnp.concatenate(
         [historical_renewal_rate, renewal_rate]
     )
     supply_forecast = supply.forecast_circulating_supply(
@@ -113,4 +115,30 @@ def run_sim(
         **minting_forecast,
         **supply_forecast,
     }
-    return results
+
+    # supply_inputs = {
+    #     'start_date': start_date,
+    #     'current_date': current_date,
+    #     'end_date': end_date,
+    #     'circ_supply_zero': circ_supply_zero,
+    #     'locked_fil_zero': locked_fil_zero,
+    #     'daily_burnt_fil': daily_burnt_fil,
+    #     'duration': duration,
+    #     'full_renewal_rate_vec': full_renewal_rate_vec,
+    #     'burnt_fil_vec': burnt_fil_vec,
+    #     'vesting_forecast': vesting_forecast,
+    #     'minting_forecast': minting_forecast,
+    #     'known_scheduled_pledge_release_full_vec': known_scheduled_pledge_release_full_vec,
+    #     'lock_target': lock_target,
+    # }
+
+    # power_inputs = {
+    #     "rb_power_zero": rb_power_zero,
+    #     "qa_power_zero": qa_power_zero,
+    #     "historical_raw_power_eib": historical_raw_power_eib,
+    #     "historical_qa_power_eib": historical_qa_power_eib,
+    #     "historical_onboarded_qa_power_pib": historical_onboarded_qa_power_pib,
+    #     "historical_renewed_qa_power_pib": historical_renewed_qa_power_pib,
+    # }
+
+    return results #, supply_inputs, rb_power_forecast, qa_power_forecast, power_inputs

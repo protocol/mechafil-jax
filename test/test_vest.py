@@ -1,6 +1,9 @@
 import unittest
 from datetime import date, timedelta
 
+from jax import config
+config.update("jax_enable_x64", True)
+
 import mechafil_jax.vesting as jax_vest
 import mechafil.vesting as np_vest
 import mechafil.data as data
@@ -32,10 +35,10 @@ class TestVesting(unittest.TestCase):
         # compare
         is_close = np.allclose(np.asarray(np_vesting_df['total_vest'].values), 
                                np.asarray(jax_vesting_dict['total_vest']))
-        if not is_close:
-            with open('vesting.pkl', 'wb') as f:
-                pickle.dump((np_vesting_df, jax_vesting_dict), f)
-                print('Test failed - saving vesting.pkl for debugging')
+        # if not is_close:
+        #     with open('vesting.pkl', 'wb') as f:
+        #         pickle.dump((np_vesting_df, jax_vesting_dict), f)
+        #         print('Test failed - saving vesting.pkl for debugging')
         self.assertTrue(is_close)
         
         
