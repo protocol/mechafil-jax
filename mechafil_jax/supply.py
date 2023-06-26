@@ -8,7 +8,7 @@ import jax.lax as lax
 import jax.numpy as jnp
 from functools import partial
 
-import mechafil_jax.flax as flax
+import mechafil_jax.imitate_lax as imitate_lax
 
 from .locking import (
     get_day_schedule_pledge_release,
@@ -166,7 +166,7 @@ def forecast_circulating_supply(
     current_day_idx = current_day - start_day
     init_in = (day_idx_start, current_day_idx, cs_dict, known_scheduled_pledge_release_vec, circ_supply, daily_burnt_fil, len(burnt_fil_vec), renewal_rate_vec, duration, lock_target)
     ret, _ = lax.scan(update_cs_day, init_in, None, length=sim_len)
-    # ret, _ = flax.scan(update_cs_day, init_in, None, length=sim_len-1)  # for debugging and seeing print statements
+    # ret, _ = imitate_lax.scan(update_cs_day, init_in, None, length=sim_len-1)  # for debugging and seeing print statements
     cs_dict = ret[2]
 
     return cs_dict
