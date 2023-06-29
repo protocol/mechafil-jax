@@ -30,7 +30,8 @@ GROWTH_RATE = float(
 # 3189227188947035000 from https://observable-api.starboard.ventures/api/v1/observable/network-storage-capacity/new_baseline_power
 BASELINE_STORAGE = 2.766213637444971 * EXA / EXBI  # b_0 from https://spec.filecoin.io/#section-systems.filecoin_token
 
-@partial(jax.jit, static_argnums=(0, 1, 6, 7, 8))
+# @partial(jax.jit, static_argnums=(0, 1, 6, 7, 8))
+@partial(jax.jit, static_argnums=(0, 1, 6, 8))
 def compute_minting_trajectory_df(
     start_date: np.datetime64,
     end_date: np.datetime64,
@@ -39,7 +40,7 @@ def compute_minting_trajectory_df(
     qa_day_onboarded_power_pib: Union[jnp.ndarray, NDArray],
     qa_day_renewed_power_pib: Union[jnp.ndarray, NDArray],
     zero_cum_capped_power_eib: float,
-    init_baseline_eib: float,
+    baseline_function_EIB: Union[jnp.ndarray, NDArray],
     minting_base: str = 'RBP'
 ) -> Dict:
     # do things in EIB to prevent overflow
@@ -63,7 +64,8 @@ def compute_minting_trajectory_df(
     # Compute cumulative rewards due to simple minting
     minting_dict["cum_simple_reward"] = cum_simple_minting(minting_dict["days"])
     # Compute cumulative rewards due to baseline minting
-    minting_dict["network_baseline_EIB"] = compute_baseline_power_array(start_date, end_date, init_baseline_eib)
+    # minting_dict["network_baseline_EIB"] = compute_baseline_power_array(start_date, end_date, init_baseline_eib)
+    minting_dict["network_baseline_EIB"] = baseline_function_EIB
 
     minting_dict["capped_power_EIB"] = jnp.minimum(minting_dict["network_baseline_EIB"], minting_dict[capped_power_reference])
     # zero_cum_capped_power = get_cum_capped_rb_power(start_date)

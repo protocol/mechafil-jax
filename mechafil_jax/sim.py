@@ -16,12 +16,14 @@ import mechafil_jax.vesting as vesting
 import mechafil_jax.minting as minting
 import mechafil_jax.supply as supply
 
-@partial(jax.jit, static_argnums=(4,5,6,7))
+# @partial(jax.jit, static_argnums=(4,5,6,7))
+@partial(jax.jit, static_argnums=(5,6,7,8))
 def run_sim(
     rb_onboard_power: jnp.array,
     renewal_rate: jnp.array,
     fil_plus_rate: jnp.array,
     lock_target: float,
+    baseline_function_EIB: jnp.array,
     
     start_date: datetime.date,
     current_date: datetime.date,
@@ -82,7 +84,7 @@ def run_sim(
         qa_day_onboarded_power_pib,
         qa_day_renewed_power_pib,
         zero_cum_capped_power_eib,
-        init_baseline_eib
+        baseline_function_EIB
     )
 
     full_renewal_rate_vec = jnp.concatenate(
