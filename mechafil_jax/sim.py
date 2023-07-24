@@ -15,6 +15,7 @@ import mechafil_jax.power as power
 import mechafil_jax.vesting as vesting
 import mechafil_jax.minting as minting
 import mechafil_jax.supply as supply
+import mechafil_jax.constants as C
 
 @partial(jax.jit, static_argnums=(4,5,6,7))
 def run_sim(
@@ -117,29 +118,14 @@ def run_sim(
         **supply_forecast,
     }
 
-    # supply_inputs = {
-    #     'start_date': start_date,
-    #     'current_date': current_date,
-    #     'end_date': end_date,
-    #     'circ_supply_zero': circ_supply_zero,
-    #     'locked_fil_zero': locked_fil_zero,
-    #     'daily_burnt_fil': daily_burnt_fil,
-    #     'duration': duration,
-    #     'full_renewal_rate_vec': full_renewal_rate_vec,
-    #     'burnt_fil_vec': burnt_fil_vec,
-    #     'vesting_forecast': vesting_forecast,
-    #     'minting_forecast': minting_forecast,
-    #     'known_scheduled_pledge_release_full_vec': known_scheduled_pledge_release_full_vec,
-    #     'lock_target': lock_target,
-    # }
+    ############################
+    # add generated quantities
+    results['day_pledge_per_QAP'] = C.PIB_PER_SECTOR * (results['day_locked_pledge']-results['day_renewed_pledge'])/results['day_onboarded_power_QAP_PIB']
+    results['day_rewards_per_sector'] = C.EIB_PER_SECTOR * results['day_network_reward'] / results['network_QAP_EIB']
+    days_1y = 365
+    rps = jnp.convolve(results['day_rewards_per_sector'], jnp.ones(days_1y), mode='full')
+    results['1y_return_per_sector'] = rps[days_1y-1:1-days_1y]
+    results['1y_sector_roi'] = results['1y_return_per_sector'] / results['day_pledge_per_QAP'][:1-days_1y]
+    ############################
 
-    # power_inputs = {
-    #     "rb_power_zero": rb_power_zero,
-    #     "qa_power_zero": qa_power_zero,
-    #     "historical_raw_power_eib": historical_raw_power_eib,
-    #     "historical_qa_power_eib": historical_qa_power_eib,
-    #     "historical_onboarded_qa_power_pib": historical_onboarded_qa_power_pib,
-    #     "historical_renewed_qa_power_pib": historical_renewed_qa_power_pib,
-    # }
-
-    return results #, supply_inputs, rb_power_forecast, qa_power_forecast, power_inputs
+    return results
