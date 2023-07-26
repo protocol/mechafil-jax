@@ -120,7 +120,9 @@ def run_sim(
 
     ############################
     # add generated quantities
-    results['day_pledge_per_QAP'] = C.PIB_PER_SECTOR * (results['day_locked_pledge']-results['day_renewed_pledge'])/results['day_onboarded_power_QAP_PIB']
+    dppq = C.PIB_PER_SECTOR * (results['day_locked_pledge']-results['day_renewed_pledge'])/results['day_onboarded_power_QAP_PIB']
+    dppq = dppq.at[0].set(dppq[1]) # div/by/zero fix for ROI
+    results['day_pledge_per_QAP'] = dppq
     results['day_rewards_per_sector'] = C.EIB_PER_SECTOR * results['day_network_reward'] / results['network_QAP_EIB']
     days_1y = 365
     rps = jnp.convolve(results['day_rewards_per_sector'], jnp.ones(days_1y), mode='full')
