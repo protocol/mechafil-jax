@@ -21,13 +21,13 @@ def run_sim(
     rb_onboard_power: jnp.array,
     renewal_rate: jnp.array,
     fil_plus_rate: jnp.array,
-    lock_target: float,
-    
+    lock_target: jnp.array, 
     start_date: datetime.date,
     current_date: datetime.date,
     forecast_length: int,
     duration: int,
     data: Dict,
+    gamma: float, 
 ):
     end_date = current_date + datetime.timedelta(days=forecast_length)
 
@@ -88,6 +88,13 @@ def run_sim(
     full_renewal_rate_vec = jnp.concatenate(
         [historical_renewal_rate, renewal_rate]
     )
+
+    historical_target_lock = jnp.ones(len(historical_renewal_rate)) * 0.3
+    full_lock_target_vec = jnp.concatenate(
+        [historical_target_lock, lock_target]
+    )
+
+
     supply_forecast = supply.forecast_circulating_supply(
         np.datetime64(start_date),
         np.datetime64(current_date),
@@ -101,7 +108,8 @@ def run_sim(
         vesting_forecast,
         minting_forecast,
         known_scheduled_pledge_release_full_vec,
-        lock_target=lock_target,
+        full_lock_target_vec,
+        gamma=gamma, 
     )
 
     # collate results

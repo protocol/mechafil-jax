@@ -34,7 +34,8 @@ def compute_day_delta_pledge(
     baseline_power_eib: float,
     renewal_rate: float,
     scheduled_pledge_release: float,
-    lock_target: float = 0.3,
+    lock_target: float,
+    gamma: float,
 ) -> float:
     # convert powers to PIB
     total_qa_power_pib = total_qa_power_eib * 1024.0
@@ -47,6 +48,7 @@ def compute_day_delta_pledge(
         total_qa_power_pib,
         baseline_power_pib,
         lock_target,
+        gamma,
     )
     renews_delta = compute_renewals_delta_pledge(
         day_network_reward,
@@ -57,6 +59,7 @@ def compute_day_delta_pledge(
         renewal_rate,
         scheduled_pledge_release,
         lock_target,
+        gamma, 
     )
     return onboards_delta + renews_delta
 
@@ -70,13 +73,14 @@ def compute_day_locked_pledge(
     baseline_power_eib: float,
     renewal_rate: float,
     scheduled_pledge_release: float,
-    lock_target: float = 0.3,
+    lock_target: float,
+    gamma: float,
 ) -> float:
     # convert powers to PIB
     total_qa_power_pib = total_qa_power_eib * 1024.0
     baseline_power_pib = baseline_power_eib * 1024.0
 
-    # print('jax', day_network_reward, prev_circ_supply, day_onboarded_qa_power_pib, total_qa_power_pib, baseline_power_pib, lock_target)
+    print('jax', day_network_reward, prev_circ_supply, day_onboarded_qa_power_pib, total_qa_power_pib, baseline_power_pib, lock_target)
     # Total locked from new onboards
     onboards_locked = compute_new_pledge_for_added_power(
         day_network_reward,
@@ -85,6 +89,7 @@ def compute_day_locked_pledge(
         total_qa_power_pib,
         baseline_power_pib,
         lock_target,
+        gamma, 
     )
     # print('jax', onboards_locked)
     # Total locked from renewals
@@ -96,6 +101,7 @@ def compute_day_locked_pledge(
         total_qa_power_pib,
         baseline_power_pib,
         lock_target,
+        gamma, 
     )
     renews_locked = jnp.maximum(original_pledge, new_pledge)
     # Total locked pledge
@@ -113,6 +119,7 @@ def compute_renewals_delta_pledge(
     renewal_rate: float,
     scheduled_pledge_release: float,
     lock_target: float,
+    gamma: float, 
 ) -> float:
     # Delta from sectors expiring
     expire_delta = -(1 - renewal_rate) * scheduled_pledge_release
@@ -125,6 +132,7 @@ def compute_renewals_delta_pledge(
         total_qa_power,
         baseline_power,
         lock_target,
+        gamma, 
     )
     renew_delta = jnp.maximum(0.0, new_pledge - original_pledge)
     # Delta for all scheduled sectors
@@ -139,12 +147,20 @@ def compute_new_pledge_for_added_power(
     total_qa_power_pib: float,
     baseline_power_pib: float,
     lock_target: float,
+    gamma: float, 
 ) -> float:
     # storage collateral
     storage_pledge = 20.0 * day_network_reward * (day_added_qa_power_pib / total_qa_power_pib)
-    # consensus collateral
+    # consensus collateral with hybrid consensus pledge model
     normalized_qap_growth = day_added_qa_power_pib / jnp.maximum(total_qa_power_pib, baseline_power_pib)
-    consensus_pledge = jnp.maximum(lock_target * prev_circ_supply * normalized_qap_growth, 0)
+    # calculate simple consensus pledge (when gamma = 1 this is 0 and pledge is calculated as per the current spec)
+    simple_consensus_pledge = (1-gamma) * lock_target * prev_circ_supply * (day_added_qa_power_pib/total_qa_power_pib)
+    simple_consensus_pledge_pledge = jnp.maximum(simple_consensus_pledge, 0)
+    # baseline consensus pledge 
+    baseline_consensus_pledge = gamma * lock_target * prev_circ_supply * normalized_qap_growth
+    baseline_consensus_pledge = jnp.maximum(baseline_consensus_pledge, 0)
+    # Add simple and baseline pledge components for consensus pledge
+    consensus_pledge = simple_consensus_pledge + baseline_consensus_pledge
     # total added pledge
     added_pledge = storage_pledge + consensus_pledge
 
