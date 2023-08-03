@@ -36,6 +36,7 @@ def compute_day_delta_pledge(
     scheduled_pledge_release: float,
     lock_target: float,
     gamma: float,
+    gamma_weight_type: int, 
 ) -> float:
     # convert powers to PIB
     total_qa_power_pib = total_qa_power_eib * 1024.0
@@ -49,6 +50,7 @@ def compute_day_delta_pledge(
         baseline_power_pib,
         lock_target,
         gamma,
+        gamma_weight_type, 
     )
     renews_delta = compute_renewals_delta_pledge(
         day_network_reward,
@@ -60,6 +62,7 @@ def compute_day_delta_pledge(
         scheduled_pledge_release,
         lock_target,
         gamma, 
+        gamma_weight_type, 
     )
     return onboards_delta + renews_delta
 
@@ -75,6 +78,7 @@ def compute_day_locked_pledge(
     scheduled_pledge_release: float,
     lock_target: float,
     gamma: float,
+    gamma_weight_type: int, 
 ) -> float:
     # convert powers to PIB
     total_qa_power_pib = total_qa_power_eib * 1024.0
@@ -90,6 +94,7 @@ def compute_day_locked_pledge(
         baseline_power_pib,
         lock_target,
         gamma, 
+        gamma_weight_type, 
     )
     # print('jax', onboards_locked)
     # Total locked from renewals
@@ -102,6 +107,7 @@ def compute_day_locked_pledge(
         baseline_power_pib,
         lock_target,
         gamma, 
+        gamma_weight_type, 
     )
     renews_locked = jnp.maximum(original_pledge, new_pledge)
     # Total locked pledge
@@ -120,6 +126,7 @@ def compute_renewals_delta_pledge(
     scheduled_pledge_release: float,
     lock_target: float,
     gamma: float, 
+    gamma_weight_type: int, 
 ) -> float:
     # Delta from sectors expiring
     expire_delta = -(1 - renewal_rate) * scheduled_pledge_release
@@ -133,6 +140,7 @@ def compute_renewals_delta_pledge(
         baseline_power,
         lock_target,
         gamma, 
+        gamma_weight_type, 
     )
     renew_delta = jnp.maximum(0.0, new_pledge - original_pledge)
     # Delta for all scheduled sectors
@@ -147,27 +155,67 @@ def compute_new_pledge_for_added_power(
     total_qa_power_pib: float,
     baseline_power_pib: float,
     lock_target: float,
-    gamma: float, 
+    gamma: float,
+    gamma_weight_type: int,  
 ) -> float:
-    # storage collateral
+    
+    # storage pledge collateral component
     storage_pledge = 20.0 * day_network_reward * (day_added_qa_power_pib / total_qa_power_pib)
-    # consensus collateral with hybrid consensus pledge model
-    normalized_qap_growth = day_added_qa_power_pib / jnp.maximum(total_qa_power_pib, baseline_power_pib)
-    # calculate simple consensus pledge (when gamma = 1 this is 0 and pledge is calculated as per the current spec)
-    simple_consensus_pledge = (1-gamma) * lock_target * prev_circ_supply * (day_added_qa_power_pib/total_qa_power_pib)
-    simple_consensus_pledge_pledge = jnp.maximum(simple_consensus_pledge, 0)
-    # baseline consensus pledge 
-    baseline_consensus_pledge = gamma * lock_target * prev_circ_supply * normalized_qap_growth
+
+    # Compute Simple and Baseline Pledge 
+    simple_consensus_pledge = lock_target * prev_circ_supply * (day_added_qa_power_pib/total_qa_power_pib)
+    simple_consensus_pledge = jnp.maximum(simple_consensus_pledge, 0)
+
+    normalized_qap_growth = day_added_qa_power_pib / jnp.maximum(total_qa_power_pib, baseline_power_pib) # Fraction for Consensus Pledge Component
+    baseline_consensus_pledge = lock_target * prev_circ_supply * normalized_qap_growth
     baseline_consensus_pledge = jnp.maximum(baseline_consensus_pledge, 0)
-    # Add simple and baseline pledge components for consensus pledge
-    consensus_pledge = simple_consensus_pledge + baseline_consensus_pledge
+
+    # Compute Simple and Baseline Pledge Contributions to Consensus Pledge for Arithmetic, Geometric, and Harmonic Weightings 
+   
+    #ngamma parameter for weighting 
+    weighting_method = gamma_weight_type #weighting schema (must be arithmetic=0, geometric=1, or harmonic=2)
+
+    consensus_pledge = weighted_consensus(weighting_method, gamma, simple_consensus_pledge, baseline_consensus_pledge)
     # total added pledge
     added_pledge = storage_pledge + consensus_pledge
 
     pledge_cap = day_added_qa_power_pib * (constants.PIB / constants.GIB)  # The # of bytes in a GiB (Gibibyte)
     return jnp.minimum(pledge_cap, added_pledge)
 
+@jax.jit
+def arithmetic_fn(w, simple_consensus_pledge, baseline_consensus_pledge):
+    return (1 - w) * simple_consensus_pledge + w * baseline_consensus_pledge
 
+@jax.jit
+def geometric_fn(w, simple_consensus_pledge, baseline_consensus_pledge):
+    return simple_consensus_pledge ** (1 - w) * baseline_consensus_pledge ** w
+
+@jax.jit
+def harmonic_fn(w, simple_consensus_pledge, baseline_consensus_pledge):
+    return 1 / ((1 - w) * simple_consensus_pledge**-1 + w * baseline_consensus_pledge**-1)
+
+@jax.jit
+def raise_exception(w, simple_consensus_pledge, baseline_consensus_pledge):
+    raise ValueError('must be of proper weighting type')
+
+@jax.jit
+def weighted_consensus(weighting_method, w, simple_consensus_pledge, baseline_consensus_pledge):
+    return lax.cond(
+        weighting_method == 0,
+        lambda _: arithmetic_fn(w, simple_consensus_pledge, baseline_consensus_pledge),
+        lambda _: lax.cond(
+            weighting_method == 1, 
+            lambda _: geometric_fn(w, simple_consensus_pledge, baseline_consensus_pledge),
+            lambda _: lax.cond(
+                weighting_method == 2, 
+                lambda _: harmonic_fn(w, simple_consensus_pledge, baseline_consensus_pledge),
+                lambda _: jnp.zeros_like(simple_consensus_pledge) * jnp.inf,  # Default branch, raise an error or handle it accordingly
+                operand=None
+            ),
+            operand=None
+        ),
+        operand=None
+    )
 @jax.jit
 def have_known_pledge_info(arggs):
     known_scheduled_pledge_release_vec, day_i = arggs

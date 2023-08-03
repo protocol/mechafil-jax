@@ -27,7 +27,8 @@ def run_sim(
     forecast_length: int,
     duration: int,
     data: Dict,
-    gamma: float, 
+    gamma: float=1,
+    gamma_weight_type: int = 0, #arithmetic=0, geometric=1, harmonic=3
 ):
     end_date = current_date + datetime.timedelta(days=forecast_length)
 
@@ -109,7 +110,8 @@ def run_sim(
         minting_forecast,
         known_scheduled_pledge_release_full_vec,
         full_lock_target_vec,
-        gamma=gamma, 
+        gamma, 
+        gamma_weight_type, 
     )
 
     # collate results
