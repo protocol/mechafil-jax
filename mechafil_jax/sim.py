@@ -37,6 +37,7 @@ def run_sim(
     qa_power_zero = data["qa_power_zero"]
     historical_raw_power_eib = data["historical_raw_power_eib"]
     historical_qa_power_eib = data["historical_qa_power_eib"]
+    historical_onboarded_rb_power_pib = data["historical_onboarded_rb_power_pib"]
     historical_onboarded_qa_power_pib = data["historical_onboarded_qa_power_pib"]
     historical_renewed_qa_power_pib = data["historical_renewed_qa_power_pib"]
     
@@ -62,7 +63,7 @@ def run_sim(
     # need to concatenate historical power (from start_date to current_date-1) to this
     rb_total_power_eib = jnp.concatenate((historical_raw_power_eib, (rb_power_forecast["total_power"][:-1] / 1024.0)))
     qa_total_power_eib = jnp.concatenate((historical_qa_power_eib, (qa_power_forecast["total_power"][:-1] / 1024.0)))
-    # rb_day_onboarded_power_pib = rb_power_forecast["onboarded_power"]
+    rb_day_onboarded_power_pib = jnp.concatenate((historical_onboarded_rb_power_pib, (rb_power_forecast["onboarded_power"][:-1] / 1024.0)))
     # rb_day_renewed_power_pib = rb_power_forecast["renewed_power"]
     qa_day_onboarded_power_pib = jnp.concatenate([historical_onboarded_qa_power_pib, qa_power_forecast["onboarded_power"][:-1]])
     qa_day_renewed_power_pib = jnp.concatenate([historical_renewed_qa_power_pib, qa_power_forecast["renewed_power"][:-1]])
@@ -109,7 +110,7 @@ def run_sim(
     results = {
         "rb_total_power_eib": rb_total_power_eib,
         "qa_total_power_eib": qa_total_power_eib,
-        # "rb_day_onboarded_power_pib": rb_day_onboarded_power_pib,
+        "rb_day_onboarded_power_pib": rb_day_onboarded_power_pib,
         # "rb_day_renewed_power_pib": rb_day_renewed_power_pib,
         "qa_day_onboarded_power_pib": qa_day_onboarded_power_pib,
         "qa_day_renewed_power_pib": qa_day_renewed_power_pib,

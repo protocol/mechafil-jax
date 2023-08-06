@@ -37,6 +37,7 @@ def get_simulation_data(bearer_token_or_auth_file:str,
         "qa_power_zero": qa_power_zero,
         "historical_raw_power_eib": fil_stats_df["total_raw_power_eib"].values,
         "historical_qa_power_eib": fil_stats_df["total_qa_power_eib"].values,
+        "historical_onboarded_rb_power_pib": fil_stats_df["day_onboarded_rb_power_pib"].values,
         "historical_onboarded_qa_power_pib": fil_stats_df["day_onboarded_qa_power_pib"].values,
         "historical_renewed_qa_power_pib": fil_stats_df["day_renewed_qa_power_pib"].values,
 
