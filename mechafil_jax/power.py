@@ -109,7 +109,6 @@ def compute_se_and_rr(carry, x):
 
 
 @partial(jax.jit, static_argnums=(7,8,))
-# @partial(jax.jit, static_argnums=(7,8,9,10))
 def forecast_power_stats(
     rb_power_zero: float,
     qa_power_zero: float,
