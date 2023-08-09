@@ -144,6 +144,7 @@ def forecast_power_stats(
     # convert the FIL+ input into a vector
     # if already a vector, still works
     fil_plus_m_vec = jnp.ones(forecast_length) * fil_plus_m
+    # NOTE: this should be moved to the top-level function I think
     assert len(fil_plus_m_vec) == forecast_length, "fil_plus_m must be of length forecast_length"
 
     total_rb_onboarded_power = day_rb_onboarded_power.cumsum()
