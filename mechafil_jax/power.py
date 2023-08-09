@@ -21,7 +21,7 @@ NOTE:
 #  we need a more systematic way to benchmark all of this
 def compute_qa_factor(
     fil_plus_rate: Union[jnp.array, NDArray],
-    fil_plus_m: float = 10.0,
+    fil_plus_m: Union[jnp.array, NDArray],
     duration_m: Callable = None,
     duration: int = None,
 ) -> Union[jnp.array, NDArray, float]:
@@ -38,7 +38,7 @@ def compute_qa_factor(
 def forecast_qa_daily_onboardings(
     rb_onboard_power: Union[jnp.array, NDArray],
     fil_plus_rate: Union[jnp.array, NDArray],
-    fil_plus_m: float = 10.0,
+    fil_plus_m: Union[jnp.array, NDArray],
     duration_m: Callable = None,
     duration: int = None,
 ) -> jnp.array:
@@ -77,19 +77,18 @@ def dont_have_modeled_sector_expiration_info(arggs):
 
 @jax.jit
 def compute_se_and_rr(carry, x):
-    # NOTE: this function has a pretty big carry.
+    # NOTE: this function has a pretty big carry, revisit to try to optimize
     # This discussion is relevant: https://github.com/google/jax/discussions/10233
-    # Ultimately - the goal of this is not necessarily for speed, but for differentiability, so it may be OBE.
-    day_rb_renewed_power_vec, rb_known_sched_expire, day_rb_onboarded_power, renewal_rate_vec, day_i, duration = carry
+    day_renewed_power_vec, known_sched_expire, day_onboarded_power, renewal_rate_vec, day_i, duration, filp_m_vec = carry
     
     # compute the components of SE power
     # known SE
-    pred = day_i > len(rb_known_sched_expire) - 1
+    pred = day_i > len(known_sched_expire) - 1
     known_day_se_power = lax.cond(
         pred, 
         dont_have_known_se_sector_info,
         have_known_se_sector_info, 
-        (rb_known_sched_expire, day_i)
+        (known_sched_expire, day_i)
      )
     
     pred = day_i - duration >= 0
@@ -97,36 +96,63 @@ def compute_se_and_rr(carry, x):
         pred,
         have_modeled_sector_expiration_info,
         dont_have_modeled_sector_expiration_info,
-        (day_rb_onboarded_power, day_rb_renewed_power_vec, day_i, duration)
+        (day_onboarded_power, day_renewed_power_vec, day_i, duration)
     )
     day_se_power = known_day_se_power + model_day_se_power
     
     # compute new renewed power
-    day_i_rb_renewed_power = day_se_power * renewal_rate_vec[day_i]
+    day_i_renewed_power = day_se_power * renewal_rate_vec[day_i] * filp_m_vec[day_i]
     # need to set arrays in this manner -> when using jit, this is guaranteed to become inplace
-    day_rb_renewed_power_vec = day_rb_renewed_power_vec.at[day_i].set(day_i_rb_renewed_power)
+    day_renewed_power_vec = day_renewed_power_vec.at[day_i].set(day_i_renewed_power)
     
-    return (day_rb_renewed_power_vec, rb_known_sched_expire, day_rb_onboarded_power, renewal_rate_vec, day_i+1, duration), day_se_power
+    return (day_renewed_power_vec, known_sched_expire, day_onboarded_power, renewal_rate_vec, day_i+1, duration, filp_m_vec), day_se_power
+
 
 @partial(jax.jit, static_argnums=(7,8,))
 def forecast_power_stats(
     rb_power_zero: float,
     qa_power_zero: float,
-    day_rb_onboarded_power: Union[jnp.array, NDArray, float],
+    day_rb_onboarded_power: Union[jnp.array, NDArray],
     rb_known_scheduled_expire_vec: Union[jnp.array, NDArray],
     qa_known_scheduled_expire_vec: Union[jnp.array, NDArray],
     renewal_rate_vec: Union[jnp.array, NDArray],
     fil_plus_rate_vec: Union[jnp.array, NDArray],
     duration: int,
     forecast_length: int,
-    fil_plus_m: float = 10.0,
+    fil_plus_m: Union[float, jnp.array, NDArray] = 10.0,
+    qa_renew_relative_multiplier_vec: Union[jnp.array, NDArray] = 1.0,
 ):  
+    """
+    Forecast the power stats for a given day.
+
+    Args:
+        rb_power_zero: The initial power of the RB sector.
+        qa_power_zero: The initial power of the QA sector.
+        day_rb_onboarded_power: The daily onboarded power of the RB sector.
+        rb_known_scheduled_expire_vec: The known scheduled expire power of the RB sector.
+        qa_known_scheduled_expire_vec: The known scheduled expire power of the QA sector.
+        renewal_rate_vec: The renewal rate of the RB sector.
+        fil_plus_rate_vec: The FIL+ rate of the RB sector.
+        duration: The duration of the RB sector.
+        forecast_length: The length of the forecast.
+        fil_plus_m: The FIL+ multiplier, can be a vector or scalar.
+        qa_renew_relative_multiplier_vec: A vector indicating the relative multiplier applied to QA renewals.
+            The default is 1.0, which means that QA power, when renewed, will renew w/ the same QA level.
+            If the value is < 1.0, it will renew with less power.  This is useful for simulating scenarios where
+            we explore changes to the QA multiplier.
+    """
+    # convert the FIL+ input into a vector
+    # if already a vector, still works
+    fil_plus_m_vec = jnp.ones(forecast_length) * fil_plus_m
+    # NOTE: this should be moved to the top-level function I think
+    assert len(fil_plus_m_vec) == forecast_length, "fil_plus_m must be of length forecast_length"
+
     total_rb_onboarded_power = day_rb_onboarded_power.cumsum()
 
     day_qa_onboarded_power = forecast_qa_daily_onboardings(
         day_rb_onboarded_power,
         fil_plus_rate_vec,
-        fil_plus_m,
+        fil_plus_m_vec,
         duration_m=None,
         duration=duration,
     )
@@ -136,11 +162,13 @@ def forecast_power_stats(
     day_rb_renewed_power_vec = jnp.zeros(forecast_length)
     day_qa_renewed_power_vec = jnp.zeros(forecast_length)
 
-    init_in = (day_rb_renewed_power_vec, rb_known_scheduled_expire_vec, day_rb_onboarded_power, renewal_rate_vec, 0, duration)
+    rb_relative_filp_m_vec = jnp.ones(forecast_length)
+    init_in = (day_rb_renewed_power_vec, rb_known_scheduled_expire_vec, day_rb_onboarded_power, renewal_rate_vec, 0, duration, rb_relative_filp_m_vec)
     ret, day_rb_scheduled_expire_power = lax.scan(compute_se_and_rr, init_in, None, length=forecast_length)
     day_rb_renewed_power = ret[0]
 
-    init_in = (day_qa_renewed_power_vec, qa_known_scheduled_expire_vec, day_qa_onboarded_power, renewal_rate_vec, 0, duration)
+    qa_relative_filp_m_vec = jnp.ones(forecast_length) * qa_renew_relative_multiplier_vec  # works if this is a scalar or vector
+    init_in = (day_qa_renewed_power_vec, qa_known_scheduled_expire_vec, day_qa_onboarded_power, renewal_rate_vec, 0, duration, qa_relative_filp_m_vec)
     ret, day_qa_scheduled_expire_power = lax.scan(compute_se_and_rr, init_in, None, length=forecast_length)
     day_qa_renewed_power = ret[0]
 
