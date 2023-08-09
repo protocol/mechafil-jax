@@ -30,6 +30,7 @@ def run_sim(
     duration: int,
     data: Dict,
     fil_plus_m: Union[float, jnp.array, NDArray] = 10.0,
+    qa_renew_relative_multiplier_vec: Union[jnp.array, NDArray] = 1.0
 ):
     end_date = current_date + datetime.timedelta(days=forecast_length)
 
@@ -58,7 +59,7 @@ def run_sim(
         rb_power_zero, qa_power_zero, 
         rb_onboard_power, rb_known_scheduled_expire_vec, qa_known_scheduled_expire_vec,
         renewal_rate, fil_plus_rate, duration, forecast_length, 
-        fil_plus_m=fil_plus_m
+        fil_plus_m=fil_plus_m, qa_renew_relative_multiplier_vec=qa_renew_relative_multiplier_vec
     )
     # TODO: move the code block below into its own function
     #################################################
