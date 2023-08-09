@@ -21,7 +21,7 @@ NOTE:
 #  we need a more systematic way to benchmark all of this
 def compute_qa_factor(
     fil_plus_rate: Union[jnp.array, NDArray],
-    fil_plus_m: float = 10.0,
+    fil_plus_m: Union[jnp.array, NDArray],
     duration_m: Callable = None,
     duration: int = None,
 ) -> Union[jnp.array, NDArray, float]:
@@ -38,7 +38,7 @@ def compute_qa_factor(
 def forecast_qa_daily_onboardings(
     rb_onboard_power: Union[jnp.array, NDArray],
     fil_plus_rate: Union[jnp.array, NDArray],
-    fil_plus_m: float = 10.0,
+    fil_plus_m: Union[jnp.array, NDArray],
     duration_m: Callable = None,
     duration: int = None,
 ) -> jnp.array:
@@ -108,25 +108,31 @@ def compute_se_and_rr(carry, x):
     
     return (day_rb_renewed_power_vec, rb_known_sched_expire, day_rb_onboarded_power, renewal_rate_vec, day_i+1, duration), day_se_power
 
+
 @partial(jax.jit, static_argnums=(7,8,))
 def forecast_power_stats(
     rb_power_zero: float,
     qa_power_zero: float,
-    day_rb_onboarded_power: Union[jnp.array, NDArray, float],
+    day_rb_onboarded_power: Union[jnp.array, NDArray],
     rb_known_scheduled_expire_vec: Union[jnp.array, NDArray],
     qa_known_scheduled_expire_vec: Union[jnp.array, NDArray],
     renewal_rate_vec: Union[jnp.array, NDArray],
     fil_plus_rate_vec: Union[jnp.array, NDArray],
     duration: int,
     forecast_length: int,
-    fil_plus_m: float = 10.0,
+    fil_plus_m: Union[float, jnp.array, NDArray] = 10.0,
 ):  
+    # convert the FIL+ input into a vector
+    # if already a vector, still works
+    fil_plus_m_vec = jnp.ones(forecast_length) * fil_plus_m
+    assert len(fil_plus_m_vec) == forecast_length, "fil_plus_m must be of length forecast_length"
+
     total_rb_onboarded_power = day_rb_onboarded_power.cumsum()
 
     day_qa_onboarded_power = forecast_qa_daily_onboardings(
         day_rb_onboarded_power,
         fil_plus_rate_vec,
-        fil_plus_m,
+        fil_plus_m_vec,
         duration_m=None,
         duration=duration,
     )
