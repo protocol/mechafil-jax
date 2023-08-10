@@ -38,7 +38,7 @@ def passthrough(arggs):
 @jax.jit
 def update_cs_day(carry, x):
     # Compute daily change in initial pledge collateral
-    day_idx, current_day_idx, cs_dict, known_scheduled_pledge_release_vec, circ_supply, daily_burnt_fil, len_burnt_fil_vec, renewal_rate_vec, duration, lock_target = carry
+    day_idx, current_day_idx, cs_dict, known_scheduled_pledge_release_vec, circ_supply, daily_burnt_fil, len_burnt_fil_vec, renewal_rate_vec, duration, lock_target, gamma_vec, gamma_weight_type_vec = carry
 
     day_pledge_locked_vec = cs_dict["day_locked_pledge"]
     scheduled_pledge_release = get_day_schedule_pledge_release(
@@ -57,7 +57,9 @@ def update_cs_day(carry, x):
         cs_dict["network_baseline_EIB"][day_idx],
         renewal_rate_vec[day_idx],
         scheduled_pledge_release,
-        lock_target,
+        lock_target[day_idx],
+        gamma_vec[day_idx],
+        gamma_weight_type_vec[day_idx],
     )
     # Get total locked pledge (needed for future day_locked_pledge)
     day_locked_pledge, day_renewed_pledge = compute_day_locked_pledge(
@@ -69,7 +71,9 @@ def update_cs_day(carry, x):
         cs_dict["network_baseline_EIB"][day_idx],
         renewal_rate_vec[day_idx],
         scheduled_pledge_release,
-        lock_target,
+        lock_target[day_idx],
+        gamma_vec[day_idx],
+        gamma_weight_type_vec[day_idx],
     )
 
     # Compute daily change in block rewards collateral
@@ -125,6 +129,8 @@ def update_cs_day(carry, x):
         renewal_rate_vec,
         duration,
         lock_target,
+        gamma_vec,
+        gamma_weight_type_vec,
     )
     return (return_carry, None)
 
@@ -142,7 +148,9 @@ def forecast_circulating_supply(
     vest_dict: Dict,
     mint_dict: Dict,
     known_scheduled_pledge_release_vec: Union[jnp.array, NDArray],
-    lock_target: float = 0.3,
+    lock_target: Union[jnp.array, NDArray],
+    gamma: Union[jnp.array, NDArray],
+    gamma_weight_type: Union[jnp.array, NDArray],
 ) -> Dict:
     # we assume all stats started at main net launch, in 2020-10-15
     start_day = datetime64_delta_to_days(start_date - NETWORK_START)
@@ -161,10 +169,13 @@ def forecast_circulating_supply(
     circ_supply = circ_supply_zero
     sim_len = end_day - start_day
     assert len(renewal_rate_vec) == sim_len, "renewal_rate must be of length sim_len = len(historical_data) + forecast_length = {sim_len}"
+    assert len(lock_target) == sim_len, "lock_target vec must be of length sim_len = len(historical_data) + forecast_length = {sim_len}"
 
     day_idx_start = 1
     current_day_idx = current_day - start_day
-    init_in = (day_idx_start, current_day_idx, cs_dict, known_scheduled_pledge_release_vec, circ_supply, daily_burnt_fil, len(burnt_fil_vec), renewal_rate_vec, duration, lock_target)
+    init_in = (day_idx_start, current_day_idx, cs_dict, known_scheduled_pledge_release_vec, 
+               circ_supply, daily_burnt_fil, len(burnt_fil_vec), renewal_rate_vec, duration, 
+               lock_target, gamma, gamma_weight_type)
     ret, _ = lax.scan(update_cs_day, init_in, None, length=sim_len)
     # ret, _ = imitate_lax.scan(update_cs_day, init_in, None, length=sim_len-1)  # for debugging and seeing print statements
     cs_dict = ret[2]

@@ -22,7 +22,7 @@ def run_sim(
     rb_onboard_power: jnp.array,
     renewal_rate: jnp.array,
     fil_plus_rate: jnp.array,
-    lock_target: float,
+    lock_target: jnp.array,
     
     start_date: datetime.date,
     current_date: datetime.date,
@@ -30,7 +30,9 @@ def run_sim(
     duration: int,
     data: Dict,
     fil_plus_m: Union[float, jnp.array, NDArray] = 10.0,
-    qa_renew_relative_multiplier_vec: Union[jnp.array, NDArray] = 1.0
+    qa_renew_relative_multiplier_vec: Union[jnp.array, NDArray] = 1.0,
+    gamma: Union[float, jnp.array, NDArray] = 1.0,
+    gamma_weight_type: Union[int, jnp.array, NDArray] = 0,
 ):
     end_date = current_date + datetime.timedelta(days=forecast_length)
 
@@ -93,6 +95,12 @@ def run_sim(
     full_renewal_rate_vec = jnp.concatenate(
         [historical_renewal_rate, renewal_rate]
     )
+    historical_target_lock = jnp.ones(len(historical_renewal_rate)) * 0.3
+    full_lock_target_vec = jnp.concatenate(
+        [historical_target_lock, lock_target]
+    )
+    gamma_vec = jnp.ones(len(full_renewal_rate_vec)) * gamma
+    gamma_weight_type_vec = jnp.ones(len(full_renewal_rate_vec)) * gamma_weight_type
     supply_forecast = supply.forecast_circulating_supply(
         np.datetime64(start_date),
         np.datetime64(current_date),
@@ -106,7 +114,9 @@ def run_sim(
         vesting_forecast,
         minting_forecast,
         known_scheduled_pledge_release_full_vec,
-        lock_target=lock_target,
+        lock_target=full_lock_target_vec,
+        gamma=gamma_vec,
+        gamma_weight_type=gamma_weight_type_vec,
     )
 
     # collate results
