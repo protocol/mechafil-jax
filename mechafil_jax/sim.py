@@ -22,17 +22,17 @@ def run_sim(
     rb_onboard_power: jnp.array,
     renewal_rate: jnp.array,
     fil_plus_rate: jnp.array,
-    lock_target: jnp.array,
+    lock_target: Union[float, jnp.array],
     
     start_date: datetime.date,
     current_date: datetime.date,
     forecast_length: int,
     duration: int,
     data: Dict,
-    fil_plus_m: Union[float, jnp.array, NDArray] = 10.0,
-    qa_renew_relative_multiplier_vec: Union[jnp.array, NDArray] = 1.0,
-    gamma: Union[float, jnp.array, NDArray] = 1.0,
-    gamma_weight_type: Union[int, jnp.array, NDArray] = 0,
+    fil_plus_m: Union[float, jnp.array] = 10.0,
+    qa_renew_relative_multiplier_vec: jnp.array = 1.0,
+    gamma: Union[float, jnp.array] = 1.0,
+    gamma_weight_type: Union[int, jnp.array] = 0,
 ):
     end_date = current_date + datetime.timedelta(days=forecast_length)
 
@@ -44,6 +44,7 @@ def run_sim(
     historical_onboarded_rb_power_pib = data["historical_onboarded_rb_power_pib"]
     historical_onboarded_qa_power_pib = data["historical_onboarded_qa_power_pib"]
     historical_renewed_qa_power_pib = data["historical_renewed_qa_power_pib"]
+    historical_renewed_rb_power_pib = data["historical_renewed_rb_power_pib"]
     
     rb_known_scheduled_expire_vec = data["rb_known_scheduled_expire_vec"]
     qa_known_scheduled_expire_vec = data["qa_known_scheduled_expire_vec"]
@@ -68,8 +69,8 @@ def run_sim(
     # need to concatenate historical power (from start_date to current_date-1) to this
     rb_total_power_eib = jnp.concatenate((historical_raw_power_eib, (rb_power_forecast["total_power"][:-1] / 1024.0)))
     qa_total_power_eib = jnp.concatenate((historical_qa_power_eib, (qa_power_forecast["total_power"][:-1] / 1024.0)))
-    rb_day_onboarded_power_pib = jnp.concatenate((historical_onboarded_rb_power_pib, (rb_power_forecast["onboarded_power"][:-1] / 1024.0)))
-    # rb_day_renewed_power_pib = rb_power_forecast["renewed_power"]
+    rb_day_onboarded_power_pib = jnp.concatenate((historical_onboarded_rb_power_pib, (rb_power_forecast["onboarded_power"][:-1])))
+    rb_day_renewed_power_pib = jnp.concatenate((historical_renewed_rb_power_pib, (rb_power_forecast["renewed_power"][:-1])))
     qa_day_onboarded_power_pib = jnp.concatenate([historical_onboarded_qa_power_pib, qa_power_forecast["onboarded_power"][:-1]])
     qa_day_renewed_power_pib = jnp.concatenate([historical_renewed_qa_power_pib, qa_power_forecast["renewed_power"][:-1]])
 
@@ -96,6 +97,7 @@ def run_sim(
         [historical_renewal_rate, renewal_rate]
     )
     historical_target_lock = jnp.ones(len(historical_renewal_rate)) * 0.3
+    lock_target = jnp.ones(forecast_length) * lock_target
     full_lock_target_vec = jnp.concatenate(
         [historical_target_lock, lock_target]
     )
@@ -124,9 +126,10 @@ def run_sim(
         "rb_total_power_eib": rb_total_power_eib,
         "qa_total_power_eib": qa_total_power_eib,
         "rb_day_onboarded_power_pib": rb_day_onboarded_power_pib,
-        # "rb_day_renewed_power_pib": rb_day_renewed_power_pib,
+        "rb_day_renewed_power_pib": rb_day_renewed_power_pib,
         "qa_day_onboarded_power_pib": qa_day_onboarded_power_pib,
         "qa_day_renewed_power_pib": qa_day_renewed_power_pib,
+        "full_renewal_rate": full_renewal_rate_vec,
         **vesting_forecast,
         **minting_forecast,
         **supply_forecast,

@@ -40,6 +40,7 @@ def get_simulation_data(bearer_token_or_auth_file:str,
         "historical_onboarded_rb_power_pib": fil_stats_df["day_onboarded_rb_power_pib"].values,
         "historical_onboarded_qa_power_pib": fil_stats_df["day_onboarded_qa_power_pib"].values,
         "historical_renewed_qa_power_pib": fil_stats_df["day_renewed_qa_power_pib"].values,
+        "historical_renewed_rb_power_pib": fil_stats_df["day_renewed_rb_power_pib"].values,
 
         "rb_known_scheduled_expire_vec": rb_known_scheduled_expire_vec,
         "qa_known_scheduled_expire_vec": qa_known_scheduled_expire_vec,
