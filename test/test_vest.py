@@ -6,10 +6,9 @@ config.update("jax_enable_x64", True)
 
 import mechafil_jax.vesting as jax_vest
 import mechafil.vesting as np_vest
-import mechafil.data as data
+import pystarboard.data as data
 
 import numpy as np
-import pickle
 
 class TestVesting(unittest.TestCase):
     def test_vesting(self):

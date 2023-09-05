@@ -6,7 +6,7 @@ config.update("jax_enable_x64", True)
 
 import mechafil_jax.power as jax_power
 import mechafil.power as np_power
-import mechafil.data as data
+import pystarboard.data as data
 
 import numpy as np
 import jax.numpy as jnp

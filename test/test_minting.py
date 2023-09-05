@@ -5,7 +5,7 @@ from jax import config
 config.update("jax_enable_x64", True)
 
 import mechafil.power as np_power
-import mechafil.data as data
+import pystarboard.data as data
 
 import mechafil.minting as np_minting
 import mechafil_jax.minting as jax_minting
