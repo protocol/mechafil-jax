@@ -34,6 +34,45 @@ def run_sim(
     gamma: Union[float, jnp.array] = 1.0,
     gamma_weight_type: Union[int, jnp.array] = 0,
 ):
+    """
+    Run a simulation of the Filecoin network.
+
+    Parameters:
+    -----------
+    rb_onboard_power: jnp.array
+        The raw power onboarded to the network, in EiB.
+    renewal_rate: jnp.array
+        The renewal rate of the network, in EiB/day.
+    fil_plus_rate: jnp.array
+        The FIL+ rate of the network, in EiB/day.
+    lock_target: Union[float, jnp.array]
+        The target lock ratio of the network. If a float, then the lock target is constant across the simulation. If it is
+        a jnp.array, then it must be of length `forecast_length` and the lock target can be time-varying.  This applies to the
+        forecasts, but not historical data.
+    start_date: datetime.date
+        The start date of the simulation.
+    current_date: datetime.date
+        The current date of the simulation.
+    forecast_length: int
+        The length of the forecast, in days.
+    duration: int
+        Average sector duration.
+    data: Dict
+        A dictionary of historical data. See `mechafil_jax.data` for more details.
+    fil_plus_m: Union[float, jnp.array]
+        The FIL+ multiplier. If a float, then the multiplier is constant across the simulation. If it is a vector, then it must
+        be of length `forecast_length` and the multiplier can be time-varying. This applies to the forecasts, but not historical data.
+    qa_renew_relative_multiplier_vec: jnp.array
+        The QA renewal relative multiplier. If a float, then the multiplier is constant across the simulation. If it is a vector, then it must
+        be of length `forecast_length` and the multiplier can be time-varying. This applies to the forecasts, but not historical data.
+    gamma: Union[float, jnp.array]
+        The gamma parameter. If a float, then the multiplier is constant across the simulation. If it is a vector, then it must
+        be of length `forecast_length` and the multiplier can be time-varying. This applies to the forecasts, but not historical data.
+    gamma_weight_type: Union[int, jnp.array]
+        The gamma weight type. If a float, then the multiplier is constant across the simulation. If it is a vector, then it must
+        be of length `forecast_length` and the multiplier can be time-varying. This applies to the forecasts, but not historical data.
+    """
+
     end_date = current_date + datetime.timedelta(days=forecast_length)
 
     # extract data
@@ -97,12 +136,22 @@ def run_sim(
         [historical_renewal_rate, renewal_rate]
     )
     historical_target_lock = jnp.ones(len(historical_renewal_rate)) * 0.3
+    # will throw an error if lock_target is a vector of length != forecast_length, but potentially
+    # the error will be cryptic, so consider improving this
     lock_target = jnp.ones(forecast_length) * lock_target
     full_lock_target_vec = jnp.concatenate(
         [historical_target_lock, lock_target]
     )
-    gamma_vec = jnp.ones(len(full_renewal_rate_vec)) * gamma
-    gamma_weight_type_vec = jnp.ones(len(full_renewal_rate_vec)) * gamma_weight_type
+    historical_gamma = jnp.ones(len(historical_renewal_rate)) * 1.0
+    gamma = jnp.ones(forecast_length) * gamma
+    historical_gamma_weight_type = jnp.zeros(len(historical_renewal_rate))
+    gamma_weight_type = jnp.ones(forecast_length) * gamma_weight_type
+    full_gamma_vec = jnp.concatenate(
+        [historical_gamma, gamma]
+    )
+    full_gamma_weight_type_vec = jnp.concatenate(
+        [historical_gamma_weight_type, gamma_weight_type]
+    )
     supply_forecast = supply.forecast_circulating_supply(
         np.datetime64(start_date),
         np.datetime64(current_date),
@@ -117,8 +166,8 @@ def run_sim(
         minting_forecast,
         known_scheduled_pledge_release_full_vec,
         lock_target=full_lock_target_vec,
-        gamma=gamma_vec,
-        gamma_weight_type=gamma_weight_type_vec,
+        gamma=full_gamma_vec,
+        gamma_weight_type=full_gamma_weight_type_vec,
     )
 
     # collate results

@@ -95,7 +95,7 @@ class TestSupply(unittest.TestCase):
         renewal_rate_vec = np.concatenate(
             [past_renewal_rate_vec, forecast_renewal_rate_vec]
         )
-        # print(len(renewal_rate_vec), forecast_length)
+        
         cil_df = np_supply.forecast_circulating_supply_df(
             start_date,
             current_date,
@@ -132,6 +132,14 @@ class TestSupply(unittest.TestCase):
             'cum_network_reward': np.asarray(mint_df['cum_network_reward'].values),
             'day_network_reward': np.asarray(mint_df['day_network_reward'].values),
         }
+        historical_target_lock = jnp.ones(len(past_renewal_rate_vec)) * 0.3
+        lock_target = jnp.ones(forecast_length) * lock_target
+        full_lock_target_vec = jnp.concatenate(
+            [historical_target_lock, lock_target]
+        )
+        # these are the default values
+        gamma_vec = jnp.ones(len(full_lock_target_vec)) * 1.0
+        gamma_weight_type_vec = jnp.zeros(len(full_lock_target_vec))
         cil_jax = jax_supply.forecast_circulating_supply(
             np.datetime64(start_date),
             np.datetime64(current_date),
@@ -145,7 +153,9 @@ class TestSupply(unittest.TestCase):
             vest_dict,
             mint_dict,
             jnp.asarray(known_scheduled_pledge_release_full_vec),
-            lock_target=lock_target,
+            lock_target=full_lock_target_vec,
+            gamma=gamma_vec,
+            gamma_weight_type=gamma_weight_type_vec,
         )
         keys = ['circ_supply', 'network_gas_burn', 'day_locked_pledge', 'day_renewed_pledge',
                 'network_locked_pledge', 'network_locked', 'network_locked_reward', 'disbursed_reserve']

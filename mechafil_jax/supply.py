@@ -134,7 +134,7 @@ def update_cs_day(carry, x):
     )
     return (return_carry, None)
 
-@partial(jax.jit, static_argnums=(0,1,2,3,4,5,6,12))
+@partial(jax.jit, static_argnums=(0,1,2,3,4,5,6))
 def forecast_circulating_supply(
     start_date: np.datetime64,
     current_date: np.datetime64,
