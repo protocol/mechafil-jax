@@ -16,6 +16,6 @@ setuptools.setup(
     tests_require = [
         'pytest',
         'pandas==1.5.3',
-        'mechaFIL @ git+https://git@github.com:protocol/filecoin-mecha-twin.git@mechafil_jax'  # get the branch that is built for comparisons w/ jax
+        'mechaFIL @ git+https://git@github.com/protocol/filecoin-mecha-twin.git@mechafil_jax'  # get the branch that is built for comparisons w/ jax
     ]
 )

@@ -4,9 +4,10 @@ from datetime import date, timedelta
 from jax import config
 config.update("jax_enable_x64", True)
 
-import mechafil.power as np_power
 import pystarboard.data as data
+import mechafil.data as mecha_data  # remove this and associated code once we remove this from mechafil
 
+import mechafil.power as np_power
 import mechafil.minting as np_minting
 import mechafil_jax.minting as jax_minting
 import mechafil_jax.constants as C
@@ -19,6 +20,7 @@ class TestMinting(unittest.TestCase):
         # setup data access
         # TODO: better way to do this?
         data.setup_spacescope('/Users/kiran/code/filecoin-mecha-twin/kiran_spacescope_auth.json')
+        mecha_data.setup_spacescope('/Users/kiran/code/filecoin-mecha-twin/kiran_spacescope_auth.json')
 
         forecast_length = 360*2
         start_date = date(2021, 3, 16)
