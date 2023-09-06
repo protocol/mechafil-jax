@@ -22,16 +22,57 @@ def run_sim(
     rb_onboard_power: jnp.array,
     renewal_rate: jnp.array,
     fil_plus_rate: jnp.array,
-    lock_target: float,
+    lock_target: Union[float, jnp.array],
     
     start_date: datetime.date,
     current_date: datetime.date,
     forecast_length: int,
     duration: int,
     data: Dict,
-    fil_plus_m: Union[float, jnp.array, NDArray] = 10.0,
-    qa_renew_relative_multiplier_vec: Union[jnp.array, NDArray] = 1.0
+    fil_plus_m: Union[float, jnp.array] = 10.0,
+    qa_renew_relative_multiplier_vec: jnp.array = 1.0,
+    gamma: Union[float, jnp.array] = 1.0,
+    gamma_weight_type: Union[int, jnp.array] = 0,
 ):
+    """
+    Run a simulation of the Filecoin network.
+
+    Parameters:
+    -----------
+    rb_onboard_power: jnp.array
+        The raw power onboarded to the network, in EiB.
+    renewal_rate: jnp.array
+        The renewal rate of the network, in EiB/day.
+    fil_plus_rate: jnp.array
+        The FIL+ rate of the network, in EiB/day.
+    lock_target: Union[float, jnp.array]
+        The target lock ratio of the network. If a float, then the lock target is constant across the simulation. If it is
+        a jnp.array, then it must be of length `forecast_length` and the lock target can be time-varying.  This applies to the
+        forecasts, but not historical data.
+    start_date: datetime.date
+        The start date of the simulation.
+    current_date: datetime.date
+        The current date of the simulation.
+    forecast_length: int
+        The length of the forecast, in days.
+    duration: int
+        Average sector duration.
+    data: Dict
+        A dictionary of historical data. See `mechafil_jax.data` for more details.
+    fil_plus_m: Union[float, jnp.array]
+        The FIL+ multiplier. If a float, then the multiplier is constant across the simulation. If it is a vector, then it must
+        be of length `forecast_length` and the multiplier can be time-varying. This applies to the forecasts, but not historical data.
+    qa_renew_relative_multiplier_vec: jnp.array
+        The QA renewal relative multiplier. If a float, then the multiplier is constant across the simulation. If it is a vector, then it must
+        be of length `forecast_length` and the multiplier can be time-varying. This applies to the forecasts, but not historical data.
+    gamma: Union[float, jnp.array]
+        The gamma parameter. If a float, then the multiplier is constant across the simulation. If it is a vector, then it must
+        be of length `forecast_length` and the multiplier can be time-varying. This applies to the forecasts, but not historical data.
+    gamma_weight_type: Union[int, jnp.array]
+        The gamma weight type. If a float, then the multiplier is constant across the simulation. If it is a vector, then it must
+        be of length `forecast_length` and the multiplier can be time-varying. This applies to the forecasts, but not historical data.
+    """
+
     end_date = current_date + datetime.timedelta(days=forecast_length)
 
     # extract data
@@ -42,6 +83,7 @@ def run_sim(
     historical_onboarded_rb_power_pib = data["historical_onboarded_rb_power_pib"]
     historical_onboarded_qa_power_pib = data["historical_onboarded_qa_power_pib"]
     historical_renewed_qa_power_pib = data["historical_renewed_qa_power_pib"]
+    historical_renewed_rb_power_pib = data["historical_renewed_rb_power_pib"]
     
     rb_known_scheduled_expire_vec = data["rb_known_scheduled_expire_vec"]
     qa_known_scheduled_expire_vec = data["qa_known_scheduled_expire_vec"]
@@ -66,8 +108,8 @@ def run_sim(
     # need to concatenate historical power (from start_date to current_date-1) to this
     rb_total_power_eib = jnp.concatenate((historical_raw_power_eib, (rb_power_forecast["total_power"][:-1] / 1024.0)))
     qa_total_power_eib = jnp.concatenate((historical_qa_power_eib, (qa_power_forecast["total_power"][:-1] / 1024.0)))
-    rb_day_onboarded_power_pib = jnp.concatenate((historical_onboarded_rb_power_pib, (rb_power_forecast["onboarded_power"][:-1] / 1024.0)))
-    # rb_day_renewed_power_pib = rb_power_forecast["renewed_power"]
+    rb_day_onboarded_power_pib = jnp.concatenate((historical_onboarded_rb_power_pib, (rb_power_forecast["onboarded_power"][:-1])))
+    rb_day_renewed_power_pib = jnp.concatenate((historical_renewed_rb_power_pib, (rb_power_forecast["renewed_power"][:-1])))
     qa_day_onboarded_power_pib = jnp.concatenate([historical_onboarded_qa_power_pib, qa_power_forecast["onboarded_power"][:-1]])
     qa_day_renewed_power_pib = jnp.concatenate([historical_renewed_qa_power_pib, qa_power_forecast["renewed_power"][:-1]])
 
@@ -93,6 +135,23 @@ def run_sim(
     full_renewal_rate_vec = jnp.concatenate(
         [historical_renewal_rate, renewal_rate]
     )
+    historical_target_lock = jnp.ones(len(historical_renewal_rate)) * 0.3
+    # will throw an error if lock_target is a vector of length != forecast_length, but potentially
+    # the error will be cryptic, so consider improving this
+    lock_target = jnp.ones(forecast_length) * lock_target
+    full_lock_target_vec = jnp.concatenate(
+        [historical_target_lock, lock_target]
+    )
+    historical_gamma = jnp.ones(len(historical_renewal_rate)) * 1.0
+    gamma = jnp.ones(forecast_length) * gamma
+    historical_gamma_weight_type = jnp.zeros(len(historical_renewal_rate))
+    gamma_weight_type = jnp.ones(forecast_length) * gamma_weight_type
+    full_gamma_vec = jnp.concatenate(
+        [historical_gamma, gamma]
+    )
+    full_gamma_weight_type_vec = jnp.concatenate(
+        [historical_gamma_weight_type, gamma_weight_type]
+    )
     supply_forecast = supply.forecast_circulating_supply(
         np.datetime64(start_date),
         np.datetime64(current_date),
@@ -106,7 +165,9 @@ def run_sim(
         vesting_forecast,
         minting_forecast,
         known_scheduled_pledge_release_full_vec,
-        lock_target=lock_target,
+        lock_target=full_lock_target_vec,
+        gamma=full_gamma_vec,
+        gamma_weight_type=full_gamma_weight_type_vec,
     )
 
     # collate results
@@ -114,9 +175,10 @@ def run_sim(
         "rb_total_power_eib": rb_total_power_eib,
         "qa_total_power_eib": qa_total_power_eib,
         "rb_day_onboarded_power_pib": rb_day_onboarded_power_pib,
-        # "rb_day_renewed_power_pib": rb_day_renewed_power_pib,
+        "rb_day_renewed_power_pib": rb_day_renewed_power_pib,
         "qa_day_onboarded_power_pib": qa_day_onboarded_power_pib,
         "qa_day_renewed_power_pib": qa_day_renewed_power_pib,
+        "full_renewal_rate": full_renewal_rate_vec,
         **vesting_forecast,
         **minting_forecast,
         **supply_forecast,

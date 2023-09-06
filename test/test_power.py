@@ -4,9 +4,11 @@ from datetime import date, timedelta
 from jax import config
 config.update("jax_enable_x64", True)
 
+import pystarboard.data as data
+import mechafil.data as mecha_data  # remove this and associated code once we remove this from mechafil
+
 import mechafil_jax.power as jax_power
 import mechafil.power as np_power
-import mechafil.data as data
 
 import numpy as np
 import jax.numpy as jnp
@@ -17,7 +19,8 @@ class TestPower(unittest.TestCase):
         # setup data access
         # TODO: better way to do this?
         data.setup_spacescope('/Users/kiran/code/filecoin-mecha-twin/kiran_spacescope_auth.json')
-
+        mecha_data.setup_spacescope('/Users/kiran/code/filecoin-mecha-twin/kiran_spacescope_auth.json')
+        
         forecast_length = 5*365
         start_date = date(2021, 3, 16)
         current_date = date.today() - timedelta(days=2)

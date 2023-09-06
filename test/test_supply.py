@@ -5,8 +5,10 @@ from datetime import date, timedelta
 from jax import config
 config.update("jax_enable_x64", True)
 
+import pystarboard.data as data
+import mechafil.data as mecha_data  # remove this and associated code once we remove this from mechafil
+
 import mechafil.power as np_power
-import mechafil.data as data
 import mechafil.minting as np_minting
 import mechafil.vesting as np_vesting
 
@@ -23,6 +25,7 @@ class TestSupply(unittest.TestCase):
         # setup data access
         # TODO: better way to do this?
         data.setup_spacescope('/Users/kiran/code/filecoin-mecha-twin/kiran_spacescope_auth.json')
+        mecha_data.setup_spacescope('/Users/kiran/code/filecoin-mecha-twin/kiran_spacescope_auth.json')
 
         forecast_length = 360*2
         start_date = date(2021, 3, 16)
@@ -95,7 +98,7 @@ class TestSupply(unittest.TestCase):
         renewal_rate_vec = np.concatenate(
             [past_renewal_rate_vec, forecast_renewal_rate_vec]
         )
-        # print(len(renewal_rate_vec), forecast_length)
+        
         cil_df = np_supply.forecast_circulating_supply_df(
             start_date,
             current_date,
@@ -132,6 +135,14 @@ class TestSupply(unittest.TestCase):
             'cum_network_reward': np.asarray(mint_df['cum_network_reward'].values),
             'day_network_reward': np.asarray(mint_df['day_network_reward'].values),
         }
+        historical_target_lock = jnp.ones(len(past_renewal_rate_vec)) * 0.3
+        lock_target = jnp.ones(forecast_length) * lock_target
+        full_lock_target_vec = jnp.concatenate(
+            [historical_target_lock, lock_target]
+        )
+        # these are the default values
+        gamma_vec = jnp.ones(len(full_lock_target_vec)) * 1.0
+        gamma_weight_type_vec = jnp.zeros(len(full_lock_target_vec))
         cil_jax = jax_supply.forecast_circulating_supply(
             np.datetime64(start_date),
             np.datetime64(current_date),
@@ -145,7 +156,9 @@ class TestSupply(unittest.TestCase):
             vest_dict,
             mint_dict,
             jnp.asarray(known_scheduled_pledge_release_full_vec),
-            lock_target=lock_target,
+            lock_target=full_lock_target_vec,
+            gamma=gamma_vec,
+            gamma_weight_type=gamma_weight_type_vec,
         )
         keys = ['circ_supply', 'network_gas_burn', 'day_locked_pledge', 'day_renewed_pledge',
                 'network_locked_pledge', 'network_locked', 'network_locked_reward', 'disbursed_reserve']
