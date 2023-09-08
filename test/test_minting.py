@@ -85,6 +85,11 @@ class TestMinting(unittest.TestCase):
         )
         zero_cum_capped_power_eib = data.get_cum_capped_rb_power(start_date) / C.EXBI
         init_baseline_eib = data.get_storage_baseline_value(start_date) / C.EXBI
+        baseline_function_EIB = jax_minting.compute_baseline_power_array(
+            np.datetime64(start_date), 
+            np.datetime64(end_date), 
+            init_baseline_eib
+        )
 
         jax_minting_dict = jax_minting.compute_minting_trajectory_df(
             np.datetime64(start_date),
@@ -94,7 +99,7 @@ class TestMinting(unittest.TestCase):
             qa_day_onboarded_power_pib,
             qa_day_renewed_power_pib,
             zero_cum_capped_power_eib,
-            init_baseline_eib
+            baseline_function_EIB
         )
 
         # check that the two minting trajectories are the same

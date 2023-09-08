@@ -23,12 +23,12 @@ def run_sim(
     renewal_rate: jnp.array,
     fil_plus_rate: jnp.array,
     lock_target: Union[float, jnp.array],
-    
     start_date: datetime.date,
     current_date: datetime.date,
     forecast_length: int,
     duration: int,
     data: Dict,
+    baseline_function_EIB: jnp.array = None,
     fil_plus_m: Union[float, jnp.array] = 10.0,
     qa_renew_relative_multiplier_vec: jnp.array = 1.0,
     gamma: Union[float, jnp.array] = 1.0,
@@ -121,6 +121,13 @@ def run_sim(
         start_vested_amt
     )
 
+    if baseline_function_EIB is None:
+        baseline_function_EIB = minting.compute_baseline_power_array(
+            np.datetime64(start_date), 
+            np.datetime64(end_date), 
+            init_baseline_eib
+        )
+
     minting_forecast = minting.compute_minting_trajectory_df(
         np.datetime64(start_date),
         np.datetime64(end_date),
@@ -129,7 +136,7 @@ def run_sim(
         qa_day_onboarded_power_pib,
         qa_day_renewed_power_pib,
         zero_cum_capped_power_eib,
-        init_baseline_eib
+        baseline_function_EIB
     )
 
     full_renewal_rate_vec = jnp.concatenate(
